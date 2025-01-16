@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "scheme": "your-scheme",
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to set your profile picture."
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "0e40727f-ee0f-40be-98f8-4938e5661b7d"
+      }
+    }
+  }
+}
