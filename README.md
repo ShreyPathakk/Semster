@@ -25,17 +25,21 @@ Building friendships at university is hard — especially for international and 
 
 ## Screenshots
 
-| Home | Profile | Messages |
-|------|---------|----------|
-| ![Home](screenshots/Home%20screen.jpg) | ![Profile](screenshots/Profile%20.jpg) | ![Messages](screenshots/Messages.jpg) |
+<p align="center">
+  <img src="screenshots/Semster%20Logo.png" width="200"/>
+</p>
 
-| Chat | Group Chat | Study Sessions |
-|------|------------|----------------|
-| ![Chat](screenshots/Chat%201.jpg) | ![Group Chat](screenshots/Group%20Chat.jpg) | ![Going](screenshots/Going%2C%20cant%20go.jpg) |
+| Home | Profile | My Classes |
+|------|---------|------------|
+| ![Home](screenshots/Home%20screen.jpg) | ![Profile](screenshots/Profile%20.jpg) | ![Classes](screenshots/My%20Classes.jpg) |
 
-| Profile Setup | My Classes | User Profile |
-|--------------|------------|--------------|
-| ![Setup](screenshots/Profile-setup.jpg) | ![Classes](screenshots/My%20Classes.jpg) | ![User](screenshots/User%20profile%20.jpg) |
+| Find Study Buddies | User Profile | Chat |
+|-------------------|-------------|------|
+| ![Buddies](screenshots/Find%20Study%20Buddies.jpg) | ![User](screenshots/User%20profile%20.jpg) | ![Chat](screenshots/Chat%201.jpg) |
+
+| Group Chat | Messages | Study Sessions |
+|------------|----------|----------------|
+| ![Group](screenshots/Group%20Chat.jpg) | ![Messages](screenshots/Messages.jpg) | ![Going](screenshots/Going%2C%20cant%20go.jpg) |
 
 ## Getting Started
 ```bash
