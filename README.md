@@ -26,21 +26,41 @@ Building friendships at university is hard — especially for international and 
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/Semster%20Logo.png" width="200"/>
+  <img src="screenshots/Semster%20Logo.png" width="150"/>
 </p>
 
-| Home | Profile | My Classes |
-|------|---------|------------|
-| ![Home](screenshots/Home%20screen.jpg) | ![Profile](screenshots/Profile%20.jpg) | ![Classes](screenshots/My%20Classes.jpg) |
-
-| Find Study Buddies | User Profile | Chat |
-|-------------------|-------------|------|
-| ![Buddies](screenshots/Find%20Study%20Buddies.jpg) | ![User](screenshots/User%20profile%20.jpg) | ![Chat](screenshots/Chat%201.jpg) |
-
-| Group Chat | Messages | Study Sessions |
-|------------|----------|----------------|
-| ![Group](screenshots/Group%20Chat.jpg) | ![Messages](screenshots/Messages.jpg) | ![Going](screenshots/Going%2C%20cant%20go.jpg) |
-
+<table>
+  <tr>
+    <td><img src="screenshots/Home%20screen.jpg" width="200"/></td>
+    <td><img src="screenshots/Profile%20.jpg" width="200"/></td>
+    <td><img src="screenshots/My%20Classes.jpg" width="200"/></td>
+  </tr>
+  <tr>
+    <td align="center">Home</td>
+    <td align="center">Profile</td>
+    <td align="center">My Classes</td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/Find%20Study%20Buddies.jpg" width="200"/></td>
+    <td><img src="screenshots/User%20profile%20.jpg" width="200"/></td>
+    <td><img src="screenshots/Chat%201.jpg" width="200"/></td>
+  </tr>
+  <tr>
+    <td align="center">Find Study Buddies</td>
+    <td align="center">User Profile</td>
+    <td align="center">Chat</td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/Group%20Chat.jpg" width="200"/></td>
+    <td><img src="screenshots/Messages.jpg" width="200"/></td>
+    <td><img src="screenshots/Going%2C%20cant%20go.jpg" width="200"/></td>
+  </tr>
+  <tr>
+    <td align="center">Group Chat</td>
+    <td align="center">Messages</td>
+    <td align="center">Study Sessions</td>
+  </tr>
+</table>
 ## Getting Started
 ```bash
 npm install
