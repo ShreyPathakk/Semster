@@ -1,55 +1,47 @@
-<<<<<<< HEAD
-# Welcome to your Expo app 👋
+# Semster 📚
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A full-stack student collaboration app that matches university students based on shared classes, major, and academic year — helping them form study groups and friendships before the semester even begins.
 
-## Get started
+## The Problem
+Building friendships at university is hard — especially for international and first-year students. Most students who make friends do so because they share classes, yet no platform exists to facilitate this connection intentionally. A survey of 120+ students confirmed this gap. Semster bridges it.
 
-1. Install dependencies
+## Features
+- 🔍 **Schedule-based matching** — find classmates by course, professor, and section
+- 👥 **Study group creation** — form groups with classmates and collaborate
+- 💬 **End-to-end encrypted messaging** — private and secure real-time chat
+- 📅 **Meeting scheduler** — organize study sessions with RSVP functionality
+- 🤝 **Friend discovery** — connect with students by major or academic year
+- ❓ **Ask for Help** — post questions anonymously, get answers from classmates
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
+- **Frontend:** React
+- **Backend:** Firebase (Firestore, Authentication, Realtime Database)
+- **Auth:** Secure Firebase Authentication flows
 
-2. Start the app
+## Impact
+- Tested with 120+ students across multiple rounds of user testing
+- Identified and resolved key UX bottlenecks through iterative feedback
+- Designed for scalability across any university, starting with SJSU
 
-   ```bash
-    npx expo start
-   ```
+## Screenshots
 
-In the output, you'll find options to open the app in a
+| Home | Profile | Messages |
+|------|---------|----------|
+| ![Home](screenshots/Home%20screen.jpg) | ![Profile](screenshots/Profile%20.jpg) | ![Messages](screenshots/Messages.jpg) |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Chat | Group Chat | Study Sessions |
+|------|------------|----------------|
+| ![Chat](screenshots/Chat%201.jpg) | ![Group Chat](screenshots/Group%20Chat.jpg) | ![Going](screenshots/Going%2C%20cant%20go.jpg) |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+| Profile Setup | My Classes | User Profile |
+|--------------|------------|--------------|
+| ![Setup](screenshots/Profile-setup.jpg) | ![Classes](screenshots/My%20Classes.jpg) | ![User](screenshots/User%20profile%20.jpg) |
 
-## Get a fresh project
-
-When you're ready, run:
-
+## Getting Started
 ```bash
-npm run reset-project
+npm install
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-=======
-# Semster
-Full-stack student collaboration app with schedule matching, built with React and Firebase
->>>>>>> 6c4bc8054db11abab0e546e50752fc179ea1e55f
+## Built By
+Shrey Pathak — EE Student at San José State University
