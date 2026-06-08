@@ -1,4 +1,5 @@
 // app/chat/new-message.tsx
+import 'react-native-get-random-values';
 import { useState, useEffect } from 'react';
 import { 
   View, 
@@ -39,9 +40,13 @@ export default function NewMessageScreen() {
 
   const loadFriends = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      // Get friends from both directions in friendships
+      if (authError || !user) {
+        console.error("Error fetching user:", authError);
+        return;
+      }
+  
       const { data: friends1 } = await supabase
         .from('friendships')
         .select(`
@@ -54,7 +59,7 @@ export default function NewMessageScreen() {
           )
         `)
         .eq('user_id1', user.id);
-
+  
       const { data: friends2 } = await supabase
         .from('friendships')
         .select(`
@@ -67,13 +72,21 @@ export default function NewMessageScreen() {
           )
         `)
         .eq('user_id2', user.id);
-
-      // Combine friend lists
+  
+      // Ensure valid profiles
       const allFriends = [
-        ...(friends1?.map(f => f.profiles) || []),
-        ...(friends2?.map(f => f.profiles) || [])
+        ...(friends1?.map(f => ({
+          ...f.profiles,
+          display_name: f.profiles?.display_name || 'Anonymous',
+          avatar_url: f.profiles?.avatar_url || 'https://via.placeholder.com/40',
+        })) || []),
+        ...(friends2?.map(f => ({
+          ...f.profiles,
+          display_name: f.profiles?.display_name || 'Anonymous',
+          avatar_url: f.profiles?.avatar_url || 'https://via.placeholder.com/40',
+        })) || [])
       ];
-
+  
       setFriends(allFriends);
     } catch (error) {
       console.error('Error loading friends:', error);
@@ -81,6 +94,7 @@ export default function NewMessageScreen() {
       setLoading(false);
     }
   };
+  
 
   const getFilteredFriends = () => {
     if (!searchQuery) return friends;

@@ -8,12 +8,32 @@ import {
   ScrollView, 
   Alert,
   ActivityIndicator,
-  Image,
-  FlatList 
+  Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../supabaseClient';
+
+// Import encryption utility functions
+import {
+  generateUserKeyPair,
+  generateGroupKey,
+  encryptGroupKey,
+  validateKeyPair
+} from '../../../utilities/group-encryption';
+
+// Define our elegant color palette
+const COLORS = {
+  primary: '#00838F',
+  accent: '#FF6F61',
+  background: '#FFFFFF',
+  surface: '#F5F7F8',
+  textPrimary: '#2C3A41',
+  textSecondary: '#5C6B73',
+  error: '#D32F2F',
+  border: '#E1E8EB',
+};
 
 export default function CreateGroup() {
   const router = useRouter();
@@ -43,11 +63,43 @@ export default function CreateGroup() {
     try {
       setPageLoading(true);
       await loadUserClasses();
+      await checkAndGenerateUserKeys();
     } catch (error) {
       console.error('Error loading initial data:', error);
-      Alert.alert('Error', 'Failed to load data');
+      Alert.alert('Error', 'Failed to load initial data');
     } finally {
       setPageLoading(false);
+    }
+  };
+
+  const checkAndGenerateUserKeys = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { data: existingKeys, error: keyCheckError } = await supabase
+        .from('user_keys')
+        .select('public_key, secret_key')
+        .eq('user_id', user.id);
+
+      if (keyCheckError) throw keyCheckError;
+
+      if (!existingKeys || existingKeys.length === 0) {
+        const { publicKey, secretKey } = await generateUserKeyPair();
+        
+        const { error: keyInsertError } = await supabase
+          .from('user_keys')
+          .insert({
+            user_id: user.id,
+            public_key: publicKey,
+            secret_key: secretKey
+          });
+
+        if (keyInsertError) throw keyInsertError;
+      }
+    } catch (error) {
+      console.error('Error checking/generating user keys:', error);
+      Alert.alert('Error', 'Failed to setup encryption keys');
     }
   };
 
@@ -58,7 +110,6 @@ export default function CreateGroup() {
         .from('semester_schedules')
         .select('*')
         .eq('user_id', user.id);
-
       if (error) throw error;
       setUserClasses(data || []);
     } catch (error) {
@@ -72,7 +123,6 @@ export default function CreateGroup() {
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
       const { data, error } = await supabase
         .from('semester_schedules')
         .select(`
@@ -89,9 +139,7 @@ export default function CreateGroup() {
         .eq('professor_name', selectedClass.professor_name)
         .eq('term', selectedClass.term)
         .neq('user_id', user.id);
-
       if (error) throw error;
-
       const uniqueClassmates = Array.from(
         new Set(data.map(d => d.profiles.id))
       ).map(id => {
@@ -104,7 +152,6 @@ export default function CreateGroup() {
           year: classmate.profiles.year
         };
       });
-
       setFriends(uniqueClassmates);
     } catch (error) {
       console.error('Error loading classmates:', error);
@@ -112,17 +159,25 @@ export default function CreateGroup() {
     }
   };
 
+  const toggleFriendSelection = (friendId) => {
+    setSelectedFriends(prev =>
+      prev.includes(friendId)
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
+  };
+
   const handleCreate = async () => {
     if (!formData.name.trim()) {
       Alert.alert('Error', 'Please enter a group name');
       return;
     }
-
+  
     if (!selectedClass) {
       Alert.alert('Error', 'Please select a class');
       return;
     }
-
+  
     if (selectedFriends.length < 2) {
       Alert.alert('Error', 'Please select at least 2 classmates');
       return;
@@ -131,8 +186,78 @@ export default function CreateGroup() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'User not found or not authenticated');
+        return;
+      }
 
-      const { data: group, error: groupError } = await supabase
+      // Check if selected friends have encryption keys
+      const keyCheckPromises = selectedFriends.map(friendId =>
+        supabase
+          .from('user_keys')
+          .select('public_key')
+          .eq('user_id', friendId)
+      );
+
+      const keyResults = await Promise.all(keyCheckPromises);
+      const friendsWithoutKeys = selectedFriends.filter((friendId, index) => 
+        !keyResults[index].data || keyResults[index].data.length === 0
+      );
+
+      if (friendsWithoutKeys.length > 0) {
+        const friendsWithKeys = selectedFriends.filter(
+          id => !friendsWithoutKeys.includes(id)
+        );
+
+        if (friendsWithKeys.length < 2) {
+          Alert.alert(
+            'Error',
+            'Not enough members with encryption keys. Please select different members.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        Alert.alert(
+          'Warning',
+          'Some selected members don\'t have encryption keys set up. They will be removed from the selection.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setLoading(false)
+            },
+            {
+              text: 'Continue',
+              onPress: () => createGroupWithValidMembers(user, friendsWithKeys)
+            }
+          ]
+        );
+        return;
+      }
+
+      await createGroupWithValidMembers(user, selectedFriends);
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Failed to create group');
+      setLoading(false);
+    }
+  };
+
+  const createGroupWithValidMembers = async (user, validMembers) => {
+    try {
+      // First get admin's keys
+      const { data: adminKeyData, error: adminKeyError } = await supabase
+        .from('user_keys')
+        .select('public_key, secret_key')
+        .eq('user_id', user.id)
+        .single();
+  
+      if (adminKeyError) throw adminKeyError;
+      if (!adminKeyData) throw new Error('Admin user has no encryption keys.');
+  
+      // Create the study group first
+      const { data: groupData, error: groupError } = await supabase
         .from('study_groups')
         .insert({
           name: formData.name.trim(),
@@ -143,50 +268,130 @@ export default function CreateGroup() {
         })
         .select()
         .single();
-
+  
       if (groupError) throw groupError;
-
-      const { error: creatorError } = await supabase
+      if (!groupData) throw new Error('Failed to create study group');
+  
+      console.log('Group created:', groupData.id);
+  
+      // Insert admin as member first
+      const { error: adminMemberError } = await supabase
         .from('group_members')
         .insert({
-          group_id: group.id,
+          group_id: groupData.id,
           user_id: user.id,
-          role: 'admin'
+          role: 'admin',
+          group_public_key: adminKeyData.public_key
         });
-
-      if (creatorError) throw creatorError;
-
-      const memberPromises = selectedFriends.map(friendId => 
-        supabase
+  
+      if (adminMemberError) {
+        console.error('Error adding admin member:', adminMemberError);
+        throw new Error('Failed to add admin as member');
+      }
+  
+      console.log('Admin member added');
+  
+      // Get all member public keys
+      const { data: memberKeys, error: memberKeysError } = await supabase
+        .from('user_keys')
+        .select('user_id, public_key')
+        .in('user_id', validMembers);
+  
+      if (memberKeysError) throw memberKeysError;
+      if (!memberKeys || memberKeys.length === 0) {
+        throw new Error('Failed to get member public keys');
+      }
+  
+      console.log('Got member keys:', memberKeys.length);
+  
+      // Add members one by one to better handle potential RLS issues
+      for (const memberId of validMembers) {
+        const memberKey = memberKeys.find(k => k.user_id === memberId);
+        if (!memberKey) {
+          console.warn(`No key found for member ${memberId}, skipping`);
+          continue;
+        }
+  
+        const { error: memberError } = await supabase
           .from('group_members')
           .insert({
-            group_id: group.id,
-            user_id: friendId,
-            role: 'member'
-          })
+            group_id: groupData.id,
+            user_id: memberId,
+            role: 'member',
+            group_public_key: memberKey.public_key
+          });
+  
+        if (memberError) {
+          console.error(`Error adding member ${memberId}:`, memberError);
+          // Continue with other members instead of throwing
+          continue;
+        }
+  
+        console.log(`Added member ${memberId}`);
+      }
+  
+      // Generate and distribute encryption keys
+      const newGroupKey = generateGroupKey();
+  
+      // First encrypt for admin
+      const adminEncryptedKey = encryptGroupKey(
+        newGroupKey,
+        adminKeyData.secret_key,
+        adminKeyData.public_key
       );
-
-      await Promise.all(memberPromises);
-
+  
+      const { error: adminKeyInsertError } = await supabase
+        .from('group_encryption_keys')
+        .insert({
+          group_id: groupData.id,
+          member_id: user.id,
+          encrypted_group_key: adminEncryptedKey
+        });
+  
+      if (adminKeyInsertError) {
+        console.error('Error adding admin encryption key:', adminKeyInsertError);
+        throw new Error('Failed to set up admin encryption');
+      }
+  
+      // Then encrypt for each member
+      for (const memberId of validMembers) {
+        const memberKey = memberKeys.find(k => k.user_id === memberId);
+        if (!memberKey) continue;
+  
+        const memberEncryptedKey = encryptGroupKey(
+          newGroupKey,
+          adminKeyData.secret_key,
+          memberKey.public_key
+        );
+  
+        const { error: memberKeyError } = await supabase
+          .from('group_encryption_keys')
+          .insert({
+            group_id: groupData.id,
+            member_id: memberId,
+            encrypted_group_key: memberEncryptedKey
+          });
+  
+        if (memberKeyError) {
+          console.error(`Error adding encryption key for member ${memberId}:`, memberKeyError);
+          continue;
+        }
+  
+        console.log(`Added encryption key for member ${memberId}`);
+      }
+  
       Alert.alert(
         'Success',
         'Study group created successfully!',
         [{ text: 'OK', onPress: () => router.push('/study/my-groups') }]
       );
+  
     } catch (error) {
-      console.error('Error:', error);
-      Alert.alert('Error', 'Failed to create group');
+      console.error('Error in group creation:', error);
+      Alert.alert('Error', error.message || 'Failed to create group');
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleFriendSelection = (friendId) => {
-    setSelectedFriends(prev => 
-      prev.includes(friendId)
-        ? prev.filter(id => id !== friendId)
-        : [...prev, friendId]
-    );
   };
 
   if (pageLoading) {
@@ -200,24 +405,23 @@ export default function CreateGroup() {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Create Study Group</Text>
-
       <View style={styles.form}>
         <TextInput
           style={styles.input}
           placeholder="Group Name"
+          placeholderTextColor="#666"
           value={formData.name}
-          onChangeText={(text) => setFormData({...formData, name: text})}
+          onChangeText={(text) => setFormData({ ...formData, name: text })}
         />
-
         <TextInput
           style={[styles.input, styles.textArea]}
           placeholder="Description (optional)"
+          placeholderTextColor="#666"
           value={formData.description}
-          onChangeText={(text) => setFormData({...formData, description: text})}
+          onChangeText={(text) => setFormData({ ...formData, description: text })}
           multiline
           numberOfLines={4}
         />
-
         <View style={styles.classesSection}>
           <Text style={styles.sectionTitle}>Select Class</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -238,7 +442,6 @@ export default function CreateGroup() {
             ))}
           </ScrollView>
         </View>
-
         {selectedClass && (
           <View style={styles.classmatesSection}>
             <Text style={styles.sectionTitle}>
@@ -257,7 +460,7 @@ export default function CreateGroup() {
                       styles.friendButton,
                       selectedFriends.includes(friend.id) && styles.selectedFriend
                     ]}
-                    onPress={() => router.push(`/(user)/${friend.id}`)} // Fixed navigation path
+                    onPress={() => router.push(`/(user)/${friend.id}`)}
                   >
                     <View style={styles.friendInfo}>
                       <Image 
@@ -290,18 +493,18 @@ export default function CreateGroup() {
             )}
           </View>
         )}
-
         <TextInput
           style={styles.input}
           placeholder="Max Members (3-20)"
+          placeholderTextColor="#666"
           value={formData.maxMembers}
           onChangeText={(text) => {
             const num = parseInt(text) || 3;
-            setFormData({...formData, maxMembers: Math.min(Math.max(num, 3), 20).toString()})
+            setFormData({ ...formData, maxMembers: Math.min(Math.max(num, 3), 20).toString() })
           }}
           keyboardType="numeric"
         />
-
+        {/* Gradient Create Button */}
         <TouchableOpacity
           style={[styles.createButton, loading && styles.buttonDisabled]}
           onPress={handleCreate}
@@ -310,7 +513,9 @@ export default function CreateGroup() {
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.createButtonText}>Create Group</Text>
+            <LinearGradient colors={[COLORS.primary, COLORS.accent]} style={styles.gradientButton}>
+              <Text style={styles.createButtonText}>Create Group</Text>
+            </LinearGradient>
           )}
         </TouchableOpacity>
       </View>
@@ -332,6 +537,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     margin: 20,
     color: '#333',
+    textAlign: 'center',
   },
   form: {
     padding: 20,
@@ -342,6 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 15,
     fontSize: 16,
+    color: '#333',
   },
   textArea: {
     height: 100,
@@ -375,6 +582,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
+    color: '#333',
   },
   classDetails: {
     fontSize: 14,
@@ -424,15 +632,20 @@ const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#ddd',
   },
+  addButton: {
+    padding: 4,
+  },
   createButton: {
-    backgroundColor: '#007AFF',
+    marginTop: 20,
+  },
+  gradientButton: {
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 20,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
   createButtonText: {
     color: '#fff',

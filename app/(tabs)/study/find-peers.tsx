@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../../supabaseClient';
 
 export default function FindPeersScreen() {
@@ -111,23 +112,28 @@ export default function FindPeersScreen() {
     }
   };
 
-  const renderClassCard = ({ item }) => (
-    <TouchableOpacity 
-      style={[
-        styles.classCard,
-        selectedClass?.id === item.id && styles.selectedClass
-      ]}
-      onPress={() => findClassmates(item)}
-    >
-      <Text style={styles.className}>{item.class_name}</Text>
-      <Text style={styles.classDetails}>
-        Professor: {item.professor_name}
-      </Text>
-      <Text style={styles.classDetails}>
-        Section: {item.section} • {item.term}
-      </Text>
-    </TouchableOpacity>
-  );
+  // Wrap each class card in a gradient border
+  const renderClassCard = ({ item }) => {
+    const isSelected = selectedClass?.id === item.id;
+    return (
+      <TouchableOpacity onPress={() => findClassmates(item)}>
+        <LinearGradient 
+          // Use one gradient if selected, another if not
+          colors={isSelected ? ['#FF512F', '#DD2476'] : ['#4c669f', '#3b5998', '#192f6a']}
+          style={styles.gradientBorder}>
+          <View style={[styles.classCard, isSelected && styles.selectedClass]}>
+            <Text style={styles.className}>{item.class_name}</Text>
+            <Text style={styles.classDetails}>
+              Professor: {item.professor_name}
+            </Text>
+            <Text style={styles.classDetails}>
+              Section: {item.section} • {item.term}
+            </Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const renderClassmate = ({ item }) => (
     <TouchableOpacity 
@@ -169,63 +175,75 @@ export default function FindPeersScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
+      <LinearGradient 
+        colors={['#ffffff', '#e6f0ff']}
+        style={styles.gradientContainer}
+      >
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Find Study Buddies</Text>
+    <LinearGradient 
+      colors={['#ffffff', '#e6f0ff']}
+      style={styles.gradientContainer}
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>Find Study Buddies</Text>
 
-      <View style={styles.classesSection}>
-        <Text style={styles.sectionTitle}>Your Classes</Text>
-        <FlatList
-          horizontal
-          data={userClasses}
-          renderItem={renderClassCard}
-          keyExtractor={item => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.classesContainer}
-        />
-      </View>
+        <View style={styles.classesSection}>
+          <Text style={styles.sectionTitle}>Your Classes</Text>
+          <FlatList
+            horizontal
+            data={userClasses}
+            renderItem={renderClassCard}
+            keyExtractor={item => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.classesContainer}
+          />
+        </View>
 
-      <View style={styles.classmatesSection}>
-        <Text style={styles.sectionTitle}>
-          {selectedClass 
-            ? `Classmates in ${selectedClass.class_name}`
-            : 'Select a class to find classmates'}
-        </Text>
-        {selectedClass ? (
-          classmates.length > 0 ? (
-            <FlatList
-              data={classmates}
-              renderItem={renderClassmate}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.classmatesContainer}
-            />
+        <View style={styles.classmatesSection}>
+          <Text style={styles.sectionTitle}>
+            {selectedClass 
+              ? `Classmates in ${selectedClass.class_name}`
+              : 'Select a class to find classmates'}
+          </Text>
+          {selectedClass ? (
+            classmates.length > 0 ? (
+              <FlatList
+                data={classmates}
+                renderItem={renderClassmate}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.classmatesContainer}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>No classmates found</Text>
+              </View>
+            )
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No classmates found</Text>
+              <Ionicons name="school-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>Choose a class to find study buddies</Text>
             </View>
-          )
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="school-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>Choose a class to find study buddies</Text>
-          </View>
-        )}
+          )}
+        </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradientContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     padding: 16,
   },
   centered: {
@@ -253,11 +271,17 @@ const styles = StyleSheet.create({
   classesContainer: {
     paddingVertical: 8,
   },
+  // New gradient border style for class cards
+  gradientBorder: {
+    borderRadius: 14,
+    padding: 2,
+    marginRight: 12,
+    width: 254, // inner card width (250) + 2 * padding (2)
+  },
   classCard: {
     backgroundColor: '#f5f5f5',
     padding: 16,
     borderRadius: 12,
-    marginRight: 12,
     width: 250,
     shadowColor: '#000',
     shadowOffset: {
@@ -269,9 +293,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   selectedClass: {
+    // Slight background change when selected
     backgroundColor: '#E3F2FD',
-    borderColor: '#2196F3',
-    borderWidth: 1,
   },
   className: {
     fontSize: 16,

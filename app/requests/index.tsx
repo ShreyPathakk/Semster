@@ -270,7 +270,7 @@ export default function RequestsScreen() {
        {friendRequests.length === 0 && groupRequests.length === 0 && (
          <View style={styles.emptyState}>
            <Ionicons name="notifications" size={48} color="#ccc" />
-           <Text style={styles.emptyText}>No pending requests</Text>
+           <Text style={styles.emptyText}>No Pending Requests</Text>
          </View>
        )}
      </ScrollView>

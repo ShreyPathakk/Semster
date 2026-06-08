@@ -1,3 +1,4 @@
+import 'react-native-get-random-values'; 
 import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';

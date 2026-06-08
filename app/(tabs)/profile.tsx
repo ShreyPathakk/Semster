@@ -1,142 +1,141 @@
 // app/profile.tsx
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Alert, 
-  Modal,
-  TextInput,
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   ScrollView,
+  TextInput,
   ActivityIndicator,
+  Alert,
+  Modal,
   Platform
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '../../supabaseClient';
-import { useState, useEffect } from 'react';
 import ProfileImage from '../components/Profile/ProfileImage';
-import { Ionicons } from '@expo/vector-icons';
+// If available, import policy components:
+import PrivacyPolicy from '../components/PrivacyPolicy';
+import TermsAndConditions from '../components/TermsAndConditions';
+import CaliforniaConsumerPrivacyAct from '../components/CaliforniaConsumerPrivacyAct';
 
-// Define color scheme
+// Define our elegant color scheme (UK–Californian vibe)
 const COLORS = {
-  primary: '#00838F',     // Elegant teal
-  secondary: '#4A6670',   // Deep slate blue
-  accent: '#B4A5A5',      // Muted mauve
-  success: '#2E7D72',     // Deep teal green
-  warning: '#8D6E63',     // Warm brown
-  error: '#D32F2F',       // Elegant red
-  background: '#FFFFFF',
-  surface: '#F5F7F8',     // Light gray-blue
-  card: {
-    primary: '#E3F2FD',   // Light blue
-    success: '#E8F5E9',   // Light green
-    neutral: '#F8F9FA',   // Light gray
-  },
-  text: {
-    primary: '#2C3A41',   // Dark slate
-    secondary: '#5C6B73', // Medium gray
-    light: '#8E9BA1',     // Light gray
-    inverse: '#FFFFFF'    // White text
-  },
-  border: '#E1E8EB',      // Light border color
-  divider: '#EDF1F2'      // Subtle divider color
+  primary: '#00838F',      // Teal
+  accent: '#FF6F61',       // Pinkish accent
+  background: '#FFFFFF',   // Clean white background
+  surface: '#F5F7F8',      // Light neutral surface
+  textPrimary: '#2C3A41',  // Dark slate for primary text
+  textSecondary: '#5C6B73',// Medium gray for secondary text
+  error: '#D32F2F',        // Bold red for destructive actions
 };
 
 export default function ProfileScreen() {
-  // State declarations
+  // Profile states
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
-  const [isEditingAbout, setIsEditingAbout] = useState(false);
-  const [isEditingMajor, setIsEditingMajor] = useState(false);
-  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [isEditingYear, setIsEditingYear] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [currentStatus, setCurrentStatus] = useState('');
   const [aboutMe, setAboutMe] = useState('');
   const [major, setMajor] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
+
+  // Editing modal states
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [isEditingAbout, setIsEditingAbout] = useState(false);
+  const [isEditingMajor, setIsEditingMajor] = useState(false);
+  const [isEditingYear, setIsEditingYear] = useState(false);
+
+  // Settings & Policy modal states
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showCCPA, setShowCCPA] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  // Username validation function
-  const isValidUsername = (username: string) => {
-    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,19}$/;
-    return usernameRegex.test(username);
-  };
 
   useEffect(() => {
     loadProfile();
   }, []);
 
+  // Load profile information from Supabase
   const loadProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email);
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
-          
+        if (error) throw error;
         if (profile) {
           setUserProfile(profile);
           setAvatarUrl(profile.avatar_url);
+          setDisplayName(profile.display_name || '');
+          setUsername(profile.username || '');
           setCurrentStatus(profile.current_status || '');
           setAboutMe(profile.about_me || '');
           setMajor(profile.major || '');
-          setDisplayName(profile.display_name || '');
-          setUsername(profile.username || '');
           setSelectedYear(profile.year || '');
         }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      Alert.alert('Error', 'Failed to load profile.');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateAvatar = async (url) => {
+  // Update functions using Supabase
+  const updateAvatar = async (url: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
-
       const { error } = await supabase
         .from('profiles')
         .update({ avatar_url: url })
         .eq('id', user.id);
-
       if (error) throw error;
       setAvatarUrl(url);
       loadProfile();
     } catch (error) {
       console.error('Error updating avatar:', error);
-      Alert.alert('Error', 'Failed to update profile picture');
+      Alert.alert('Error', 'Failed to update profile picture.');
     }
   };
 
-  const updateProfile = async (updates) => {
+  const updateProfile = async (updates: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
-
       const { error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', user.id);
-
       if (error) throw error;
       loadProfile();
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert('Error', 'Failed to update profile.');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace('/(auth)/login');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred during sign out.');
     }
   };
 
@@ -144,31 +143,79 @@ export default function ProfileScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
-
-      // Delete user profile first
+      
+      // Update profile with minimal information instead of deleting
       const { error: profileError } = await supabase
         .from('profiles')
-        .delete()
+        .update({ 
+          display_name: '[Deleted User]',
+          username: `deleted_${Date.now()}`,
+          about_me: '',
+          current_status: '',
+          major: '',
+          year: '',
+          avatar_url: null
+        })
         .eq('id', user.id);
-      
-      if (profileError) throw profileError;
-
-      // Delete user authentication
-      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
-      if (authError) throw authError;
-
-      // Sign out and redirect
+  
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        throw new Error('Unable to process account deletion. Please contact support.');
+      }
+  
+      // Sign out the user
       await supabase.auth.signOut();
       router.replace('/(auth)/login');
+      
+      Alert.alert(
+        'Account Deactivated',
+        'Your account has been deactivated. Please contact support if you need to permanently delete your account.',
+        [{ text: 'OK' }]
+      );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to delete account');
+      Alert.alert('Error', error.message || 'Failed to deactivate account.');
     }
   };
 
-  // Handle update functions
+  // Handle update functions for editing modals
+  const handleDisplayNameUpdate = async () => {
+    if (!displayName.trim()) {
+      Alert.alert('Error', 'Display name cannot be empty.');
+      return;
+    }
+    await updateProfile({ display_name: displayName.trim() });
+    setIsEditingDisplayName(false);
+  };
+
+  const handleUsernameUpdate = async () => {
+    if (!username.trim()) {
+      Alert.alert('Error', 'Username cannot be empty.');
+      return;
+    }
+    // Optional: add username validation logic here
+    try {
+      // Check if username is taken (excluding the current user)
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .neq('id', userProfile.id)
+        .single();
+      if (existingUser) {
+        Alert.alert('Error', 'This username is already taken.');
+        return;
+      }
+      await updateProfile({ username: username.toLowerCase() });
+      setIsEditingUsername(false);
+    } catch (error) {
+      console.error('Error updating username:', error);
+      Alert.alert('Error', 'Failed to update username.');
+    }
+  };
+
   const handleStatusUpdate = async () => {
     await updateProfile({ current_status: currentStatus });
-    setIsEditingStatus(false);
+    setIsEditingStatus(false);  
   };
 
   const handleAboutUpdate = async () => {
@@ -186,63 +233,9 @@ export default function ProfileScreen() {
     setIsEditingYear(false);
   };
 
-  const handleDisplayNameUpdate = async () => {
-    if (!displayName.trim()) {
-      Alert.alert('Error', 'Display name cannot be empty');
-      return;
-    }
-    await updateProfile({ display_name: displayName.trim() });
-    setIsEditingDisplayName(false);
-  };
-
-  const handleUsernameUpdate = async () => {
-    if (!username.trim()) {
-      Alert.alert('Error', 'Username cannot be empty');
-      return;
-    }
-
-    if (!isValidUsername(username)) {
-      Alert.alert(
-        'Invalid Username',
-        'Username must start with a letter and can only contain letters, numbers, and underscores'
-      );
-      return;
-    }
-
-    try {
-      // Check if username is taken
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', username.toLowerCase())
-        .neq('id', userProfile.id)
-        .single();
-
-      if (existingUser) {
-        Alert.alert('Error', 'This username is already taken');
-        return;
-      }
-
-      await updateProfile({ username: username.toLowerCase() });
-      setIsEditingUsername(false);
-    } catch (error) {
-      console.error('Error updating username:', error);
-      Alert.alert('Error', 'Failed to update username');
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.replace('/(auth)/login');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'An error occurred during sign out');
-    }
-  };
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -250,611 +243,618 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <TouchableOpacity 
-        style={styles.settingsButton}
-        onPress={() => setIsSettingsVisible(true)}
+      {/* HEADER SECTION WITH GRADIENT */}
+      <LinearGradient
+        colors={[COLORS.primary, COLORS.accent]}
+        style={styles.headerContainer}
       >
-        <Ionicons name="settings-outline" size={24} color={COLORS.text.primary} />
-      </TouchableOpacity>
-
-      <View style={styles.content}>
-        <View style={styles.profileHeader}>
-          <ProfileImage 
-            url={avatarUrl}
-            onUpload={updateAvatar}
-            userId={userProfile?.id}
-          />
-          
-          {/* Display Name Section */}
-          <View style={styles.nameContainer}>
-            <Text style={styles.name}>{displayName}</Text>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => setIsEditingDisplayName(true)}
-            >
-              <Ionicons name="pencil" size={16} color={COLORS.text.secondary} />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Username Section */}
-          <View style={styles.usernameContainer}>
-            <Text style={styles.username}>@{username}</Text>
-            <TouchableOpacity 
-              style={styles.editButton}
-              onPress={() => setIsEditingUsername(true)}
-            >
-              <Ionicons name="pencil" size={16} color={COLORS.text.secondary} />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Year Badge */}
-          <TouchableOpacity 
-            style={styles.yearBadge}
-            onPress={() => setIsEditingYear(true)}
-          >
-            <Ionicons name="school" size={20} color={COLORS.primary} />
-            <Text style={styles.yearText}>{selectedYear || "Add year"}</Text>
-            <Ionicons 
-              name="pencil" 
-              size={16} 
-              color={COLORS.primary} 
-              style={styles.editIcon} 
-            />
-          </TouchableOpacity>
-
-          {/* Major Badge */}
-          <View style={styles.majorBadge}>
-            <Ionicons name="book" size={20} color={COLORS.success} />
-            <Text style={styles.majorText}>{major || "Add your major"}</Text>
-            <TouchableOpacity onPress={() => setIsEditingMajor(true)}>
-              <Ionicons 
-                name="pencil" 
-                size={16} 
-                color={COLORS.success} 
-                style={styles.editIcon} 
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Status Bar */}
-          <TouchableOpacity 
-            style={styles.statusBar}
-            onPress={() => setIsEditingStatus(true)}
-          >
-            <Ionicons 
-              name="ellipse" 
-              size={12} 
-              color={currentStatus ? COLORS.success : COLORS.text.light} 
-            />
-            <Text style={styles.statusText}>
-              {currentStatus || "Set your status..."}
-            </Text>
-            <Ionicons 
-              name="pencil" 
-              size={16} 
-              color={COLORS.text.secondary} 
-            />
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => setIsSettingsVisible(true)}
+        >
+          <Ionicons name="settings-outline" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <ProfileImage
+          url={avatarUrl}
+          onUpload={updateAvatar}
+          userId={userProfile?.id}
+          style={styles.profileImage}
+          editButtonColor="#000"
+        />
+        <View style={styles.nameRow}>
+          <Text style={styles.displayName}>{displayName}</Text>
+          <TouchableOpacity onPress={() => setIsEditingDisplayName(true)}>
+            <Ionicons name="pencil" size={18} color={COLORS.surface} style={styles.editIcon} />
           </TouchableOpacity>
         </View>
+        <View style={styles.nameRow}>
+          <Text style={styles.username}>@{username}</Text>
+          <TouchableOpacity onPress={() => setIsEditingUsername(true)}>
+            <Ionicons name="pencil" size={18} color={COLORS.surface} style={styles.editIcon} />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
-        <View style={styles.infoSection}>
-          {/* Student ID Card */}
-          <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Student ID</Text>
-            <Text style={styles.infoValue}>{userProfile?.student_id}</Text>
-            <Text style={styles.privateNote}>Only visible to you</Text>
+      {/* CONTENT SECTION */}
+      <View style={styles.content}>
+        {/* "About Me" Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>About Me</Text>
+            <TouchableOpacity onPress={() => setIsEditingAbout(true)}>
+              <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
           </View>
+          <Text style={styles.cardContent}>
+            {userProfile?.about_me || 'Tell others about yourself...'}
+          </Text>
+        </View>
 
-          {/* About Me Card */}
-          <View style={styles.aboutMeCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>About Me</Text>
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={() => setIsEditingAbout(true)}
-              >
-                <Ionicons name="pencil" size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.aboutMeText}>
-              {aboutMe || "Tell others about yourself..."}
+        {/* Status (Mood) Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Status</Text>
+            <TouchableOpacity onPress={() => setIsEditingStatus(true)}>
+              <Ionicons name="pencil" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.cardContent}>
+            {userProfile?.current_status || 'What\'s on your mind?'}
+          </Text>
+        </View>
+
+        {/* Row Cards for Year & Major */}
+        <View style={styles.rowContainer}>
+          <TouchableOpacity style={styles.smallCard} onPress={() => setIsEditingYear(true)}>
+            <Ionicons name="school" size={20} color={COLORS.primary} />
+            <Text style={styles.smallCardText}>
+              {userProfile?.year || 'Year'}
             </Text>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.smallCard} onPress={() => setIsEditingMajor(true)}>
+            <Ionicons name="book" size={20} color={COLORS.accent} />
+            <Text style={styles.smallCardText}>
+              {userProfile?.major || 'Major'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Sign Out Button */}
-        <TouchableOpacity 
-          style={styles.signOutButton}
+        <TouchableOpacity
+          style={[styles.card, styles.signOutCard]}
           onPress={handleSignOut}
         >
-          <Ionicons 
-            name="log-out-outline" 
-            size={20} 
-            color={COLORS.text.inverse} 
-          />
-          <Text style={styles.buttonText}>Sign Out</Text>
+          <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
+          <Text style={[styles.cardContent, { color: COLORS.error, fontWeight: '700' }]}>
+            Sign Out
+          </Text>
         </TouchableOpacity>
-
-        {/* Settings Modal */}
-        <Modal
-          visible={isSettingsVisible}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Settings</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsSettingsVisible(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity 
-                style={styles.settingsOption}
-                onPress={() => {
-                  setIsSettingsVisible(false);
-                  setShowPrivacyPolicy(true);
-                }}
-              >
-                <Ionicons name="shield-outline" size={24} color={COLORS.text.primary} />
-                <Text style={styles.settingsOptionText}>Privacy Policy</Text>
-                <Ionicons name="chevron-forward" size={24} color={COLORS.text.secondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.settingsOption}
-                onPress={() => {
-                  setIsSettingsVisible(false);
-                  setShowTerms(true);
-                }}
-              >
-                <Ionicons name="document-text-outline" size={24} color={COLORS.text.primary} />
-                <Text style={styles.settingsOptionText}>Terms & Conditions</Text>
-                <Ionicons name="chevron-forward" size={24} color={COLORS.text.secondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.settingsOption, styles.deleteOption]}
-                onPress={() => {
-                  setIsSettingsVisible(false);
-                  setShowDeleteConfirm(true);
-                }}
-              >
-                <Ionicons name="trash-outline" size={24} color={COLORS.error} />
-                <Text style={[styles.settingsOptionText, styles.deleteText]}>Delete Account</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Privacy Policy Modal */}
-        <Modal
-          visible={showPrivacyPolicy}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Privacy Policy</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowPrivacyPolicy(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.policyContent}>
-                <Text style={styles.policyText}>
-                  [Your Privacy Policy content here]
-                </Text>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Terms & Conditions Modal */}
-        <Modal
-          visible={showTerms}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Terms & Conditions</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowTerms(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.policyContent}>
-                <Text style={styles.policyText}>
-                  [Your Terms & Conditions content here]
-                </Text>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Delete Account Confirmation Modal */}
-        <Modal
-          visible={showDeleteConfirm}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Delete Account</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowDeleteConfirm(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.deleteWarningText}>
-                Are you sure you want to delete your account? This action cannot be undone.
-              </Text>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setShowDeleteConfirm(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.deleteButton]}
-                  onPress={handleDeleteAccount}
-                >
-                  <Text style={[styles.modalButtonText, styles.deleteButtonText]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Year Edit Modal */}
-        <Modal
-          visible={isEditingYear}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Year</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingYear(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.yearOptions}>
-                {['Freshman', 'Sophomore', 'Junior', 'Senior'].map((year) => (
-                  <TouchableOpacity
-                    key={year}
-                    style={[
-                      styles.yearOption,
-                      selectedYear === year && styles.selectedYearOption
-                    ]}
-                    onPress={() => setSelectedYear(year)}
-                  >
-                    <Text style={[
-                      styles.yearOptionText,
-                      selectedYear === year && styles.selectedYearOptionText
-                    ]}>
-                      {year}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingYear(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleYearUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-        {/* Display Name Edit Modal */}
-        <Modal
-          visible={isEditingDisplayName}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Display Name</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingDisplayName(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <TextInput
-                style={styles.modalInput}
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder="Your display name"
-                placeholderTextColor={COLORS.text.light}
-                maxLength={50}
-                autoFocus={true}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingDisplayName(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleDisplayNameUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Username Edit Modal */}
-        <Modal
-          visible={isEditingUsername}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Change Username</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingUsername(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.modalSubtitle}>
-                Username must start with a letter and can only contain letters, numbers, and underscores
-              </Text>
-
-              <TextInput
-                style={styles.modalInput}
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter new username"
-                placeholderTextColor={COLORS.text.light}
-                maxLength={20}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus={true}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingUsername(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleUsernameUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Status Modal */}
-        <Modal
-          visible={isEditingStatus}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Status</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingStatus(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <TextInput
-                style={styles.modalInput}
-                value={currentStatus}
-                onChangeText={setCurrentStatus}
-                placeholder="What's on your mind?"
-                placeholderTextColor={COLORS.text.light}
-                maxLength={50}
-                autoFocus={true}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingStatus(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleStatusUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* About Modal */}
-        <Modal
-          visible={isEditingAbout}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>About Me</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingAbout(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <TextInput
-                style={[styles.modalInput, styles.modalAboutInput]}
-                value={aboutMe}
-                onChangeText={setAboutMe}
-                placeholder="Tell others about yourself..."
-                placeholderTextColor={COLORS.text.light}
-                multiline
-                numberOfLines={4}
-                maxLength={200}
-                autoFocus={true}
-                textAlignVertical="top"
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingAbout(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleAboutUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Major Modal */}
-        <Modal
-          visible={isEditingMajor}
-          transparent={true}
-          animationType="slide"
-          statusBarTranslucent={true}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Major</Text>
-                <TouchableOpacity 
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsEditingMajor(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text.secondary} />
-                </TouchableOpacity>
-              </View>
-
-              <TextInput
-                style={styles.modalInput}
-                value={major}
-                onChangeText={setMajor}
-                placeholder="Your major (e.g. Computer Science)"
-                placeholderTextColor={COLORS.text.light}
-                maxLength={50}
-                autoFocus={true}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalButton}
-                  onPress={() => setIsEditingMajor(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalSaveButton]}
-                  onPress={handleMajorUpdate}
-                >
-                  <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
+
+      {/* MODALS SECTION */}
+      {/* Settings Modal */}
+      <Modal
+        visible={isSettingsVisible}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsSettingsVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsSettingsVisible(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => {
+                setIsSettingsVisible(false);
+                setShowPrivacyPolicy(true);
+              }}
+            >
+              <Ionicons name="shield-outline" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.settingsOptionText}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => {
+                setIsSettingsVisible(false);
+                setShowTerms(true);
+              }}
+            >
+              <Ionicons name="document-text-outline" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.settingsOptionText}>Terms & Conditions</Text>
+              <Ionicons name="chevron-forward" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => {
+                setIsSettingsVisible(false);
+                setShowCCPA(true);
+              }}
+            >
+              <Ionicons name="document-text-outline" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.settingsOptionText}>CCPA</Text>
+              <Ionicons name="chevron-forward" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.settingsOption, styles.deleteOption]}
+              onPress={() => {
+                setIsSettingsVisible(false);
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <Ionicons name="trash-outline" size={24} color={COLORS.error} />
+              <Text style={[styles.settingsOptionText, styles.deleteText]}>
+                Delete Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Privacy Policy Modal */}
+      <Modal
+        visible={showPrivacyPolicy}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowPrivacyPolicy(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Privacy Policy</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowPrivacyPolicy(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.policyContent}>
+              <PrivacyPolicy />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Terms & Conditions Modal */}
+      <Modal
+        visible={showTerms}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowTerms(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Terms & Conditions</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowTerms(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.policyContent}>
+              <TermsAndConditions />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CCPA Modal */}
+      <Modal
+        visible={showCCPA}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowCCPA(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>CCPA</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowCCPA(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.policyContent}>
+              <CaliforniaConsumerPrivacyAct />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Delete Account</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.deleteWarningText}>
+              Are you sure you want to delete your account? This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton]}
+                onPress={handleDeleteAccount}
+              >
+                <Text style={[styles.modalButtonText, styles.deleteButtonText]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Year Modal */}
+      <Modal
+        visible={isEditingYear}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingYear(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Year</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingYear(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.yearOptions}>
+              {['Freshman', 'Sophomore', 'Junior', 'Senior'].map((year) => (
+                <TouchableOpacity
+                  key={year}
+                  style={[
+                    styles.yearOption,
+                    selectedYear === year && styles.selectedYearOption,
+                  ]}
+                  onPress={() => setSelectedYear(year)}
+                >
+                  <Text
+                    style={[
+                      styles.yearOptionText,
+                      selectedYear === year && styles.selectedYearOptionText,
+                    ]}
+                  >
+                    {year}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingYear(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleYearUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Display Name Modal */}
+      <Modal
+        visible={isEditingDisplayName}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingDisplayName(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Display Name</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingDisplayName(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Your display name"
+              placeholderTextColor={COLORS.textSecondary}
+              maxLength={50}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingDisplayName(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleDisplayNameUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Username Modal */}
+      <Modal
+        visible={isEditingUsername}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingUsername(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Username</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingUsername(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Username must start with a letter and can only contain letters, numbers, and underscores.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Enter new username"
+              placeholderTextColor={COLORS.textSecondary}
+              maxLength={20}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingUsername(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleUsernameUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Status Modal */}
+      <Modal
+        visible={isEditingStatus}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingStatus(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Status</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingStatus(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={currentStatus}
+              onChangeText={setCurrentStatus}
+              placeholder="What's on your mind?"
+              placeholderTextColor={COLORS.textSecondary}
+              maxLength={50}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingStatus(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleStatusUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit About Me Modal */}
+      <Modal
+        visible={isEditingAbout}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingAbout(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>About Me</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingAbout(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.modalInput, styles.modalAboutInput]}
+              value={aboutMe}
+              onChangeText={setAboutMe}
+              placeholder="Tell others about yourself..."
+              placeholderTextColor={COLORS.textSecondary}
+              multiline
+              numberOfLines={4}
+              maxLength={200}
+              autoFocus={true}
+              textAlignVertical="top"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingAbout(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleAboutUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Major Modal */}
+      <Modal
+        visible={isEditingMajor}
+        transparent={true}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setIsEditingMajor(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Major</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setIsEditingMajor(false)}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={major}
+              onChangeText={setMajor}
+              placeholder="Your major (e.g. Computer Science)"
+              placeholderTextColor={COLORS.textSecondary}
+              maxLength={50}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setIsEditingMajor(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleMajorUpdate}
+              >
+                <Text style={[styles.modalButtonText, styles.saveButtonText]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  // Base container
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  profileHeader: {
+  centered: {
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
+  },
+  // Header styles
+  headerContainer: {
+    height: 250,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    position: 'relative',
   },
   settingsButton: {
     position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'ios' ? 60 : 40,
     right: 20,
     zIndex: 1,
     backgroundColor: COLORS.surface,
@@ -866,189 +866,101 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  nameContainer: {
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: COLORS.background,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
   },
-  name: {
+  displayName: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.text.primary,
-    marginRight: 8,
+    color: COLORS.background,
+    marginTop: 10,
     letterSpacing: 0.5,
-  },
-  usernameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    backgroundColor: COLORS.card.neutral,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   username: {
     fontSize: 16,
-    color: COLORS.text.secondary,
-    fontWeight: '500',
-    marginRight: 8,
-  },
-  editButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  yearBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 16,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  yearText: {
-    fontSize: 16,
-    color: COLORS.primary,
-    fontWeight: '600',
-    marginLeft: 8,
-    marginRight: 8,
-  },
-  majorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card.success,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 12,
-    shadowColor: COLORS.success,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  majorText: {
-    fontSize: 16,
-    color: COLORS.success,
-    fontWeight: '600',
-    marginLeft: 8,
-    marginRight: 8,
+    color: COLORS.background,
+    opacity: 0.9,
+    marginTop: 4,
   },
   editIcon: {
-    marginLeft: 4,
-    padding: 4,
-  },
-  statusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card.neutral,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    marginTop: 16,
-    width: '90%',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  statusText: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.text.secondary,
     marginLeft: 8,
-    marginRight: 8,
   },
-  infoSection: {
-    marginTop: 24,
+  // Content section
+  content: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  infoCard: {
-    backgroundColor: COLORS.card.neutral,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  infoValue: {
-    fontSize: 20,
-    color: COLORS.text.primary,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  privateNote: {
-    fontSize: 12,
-    color: COLORS.text.light,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  aboutMeCard: {
+  card: {
     backgroundColor: COLORS.background,
-    borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 20,
+    marginVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    color: COLORS.text.primary,
-    letterSpacing: 0.5,
+    color: COLORS.textPrimary,
   },
-  aboutMeText: {
+  cardContent: {
     fontSize: 16,
-    color: COLORS.text.secondary,
+    color: COLORS.textSecondary,
     lineHeight: 24,
   },
-  signOutButton: {
-    backgroundColor: COLORS.error,
+  rowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+  },
+  smallCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginTop: 24,
-    marginBottom: 32,
-    shadowColor: COLORS.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: COLORS.surface,
+    padding: 15,
+    borderRadius: 15,
+    marginHorizontal: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  buttonText: {
-    color: COLORS.text.inverse,
+  smallCardText: {
     fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.textPrimary,
     marginLeft: 8,
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
+  signOutCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Modal styles
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1060,6 +972,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     minHeight: 300,
+    height: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -1068,17 +981,18 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    position: 'relative',
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.text.primary,
+    color: COLORS.textPrimary,
     letterSpacing: 0.5,
-    flex: 1,
     textAlign: 'center',
+    flex: 1,
   },
   modalCloseButton: {
     position: 'absolute',
@@ -1088,7 +1002,7 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
-    color: COLORS.text.secondary,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     paddingHorizontal: 20,
@@ -1101,12 +1015,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    color: COLORS.text.primary,
+    borderColor: COLORS.surface,
+    color: COLORS.textPrimary,
+  },
+  modalAboutInput: {
+    height: 120,
+    textAlignVertical: 'top',
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   modalButton: {
     flex: 1,
@@ -1115,7 +1033,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.surface,
+    marginHorizontal: 5,
   },
   modalSaveButton: {
     backgroundColor: COLORS.primary,
@@ -1124,40 +1043,13 @@ const styles = StyleSheet.create({
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.text.primary,
+    color: COLORS.textPrimary,
   },
   saveButtonText: {
-    color: COLORS.text.inverse,
+    color: COLORS.background,
   },
-  modalAboutInput: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  yearOptions: {
-    marginBottom: 24,
-  },
-  yearOption: {
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  selectedYearOption: {
-    backgroundColor: COLORS.card.primary,
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-  },
-  yearOptionText: {
-    fontSize: 16,
-    color: COLORS.text.primary,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  selectedYearOptionText: {
-    color: COLORS.primary,
-    fontWeight: '600',
+  policyContent: {
+    flex: 1,
   },
   settingsOption: {
     flexDirection: 'row',
@@ -1170,23 +1062,15 @@ const styles = StyleSheet.create({
   settingsOptionText: {
     flex: 1,
     fontSize: 16,
-    color: COLORS.text.primary,
+    color: COLORS.textPrimary,
     marginLeft: 12,
   },
   deleteOption: {
+    backgroundColor: COLORS.surface,
     marginTop: 24,
-    backgroundColor: COLORS.card.neutral,
   },
   deleteText: {
     color: COLORS.error,
-  },
-  policyContent: {
-    maxHeight: '80%',
-  },
-  policyText: {
-    fontSize: 16,
-    color: COLORS.text.primary,
-    lineHeight: 24,
   },
   deleteWarningText: {
     fontSize: 16,
@@ -1195,11 +1079,31 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 24,
   },
-  deleteButton: {
-    backgroundColor: COLORS.error,
+  yearOptions: {
+    marginBottom: 24,
   },
-  deleteButtonText: {
-    color: COLORS.text.inverse,
+  yearOption: {
+    backgroundColor: COLORS.surface,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.surface,
+  },
+  selectedYearOption: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  yearOptionText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  selectedYearOptionText: {
+    color: COLORS.background,
+    fontWeight: '600',
   },
 });
 

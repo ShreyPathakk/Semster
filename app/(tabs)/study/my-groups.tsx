@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '../../../supabaseClient';
 
-
+// -------------------------
+// GroupManagement Component
+// -------------------------
 const GroupManagement = ({ group, onClose, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -148,6 +150,53 @@ const GroupManagement = ({ group, onClose, onUpdate }) => {
       Alert.alert('Error', 'Failed to remove member');
     }
   };
+
+  // New: Exit Group Functionality
+  const exitGroup = async () => {
+    try {
+      // Check if exiting would make group too small
+      if (currentMembers.length <= 3) {
+        Alert.alert('Error', 'Cannot exit group. Groups must have at least 3 members.');
+        return;
+      }
+
+      Alert.alert(
+        'Exit Group',
+        'Are you sure you want to exit this study group?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Exit',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { error } = await supabase
+                  .from('group_members')
+                  .delete()
+                  .eq('group_id', group.group_id)
+                  .eq('user_id', user.id);
+                if (error) throw error;
+                Alert.alert('Success', 'You have exited the group.');
+                if (onUpdate) onUpdate();
+                onClose();
+              } catch (error) {
+                console.error('Error exiting group:', error);
+                Alert.alert('Error', 'Failed to exit group');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error processing exit:', error);
+      Alert.alert('Error', 'Failed to process request');
+    }
+  };
+
   const GroupCard = ({ group }) => (
     <View style={styles.groupCard}>
       <View style={styles.groupInfo}>
@@ -200,7 +249,7 @@ const GroupManagement = ({ group, onClose, onUpdate }) => {
               onPress={() => inviteUser(user.id)}
               disabled={loading}
             >
-              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userName}>{user.display_name}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
             </TouchableOpacity>
           ))}
@@ -231,6 +280,11 @@ const GroupManagement = ({ group, onClose, onUpdate }) => {
         ))}
       </ScrollView>
 
+      {/* New Exit Group Button */}
+      <TouchableOpacity style={styles.exitButton} onPress={exitGroup}>
+        <Text style={styles.exitButtonText}>Exit Group</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.closeButton}
         onPress={onClose}
@@ -240,6 +294,10 @@ const GroupManagement = ({ group, onClose, onUpdate }) => {
     </View>
   );
 };
+
+// -------------------------
+// MyGroupsScreen Component
+// -------------------------
 export default function MyGroupsScreen() {
   const [loading, setLoading] = useState(true);
   const [myGroups, setMyGroups] = useState([]);
@@ -313,7 +371,6 @@ export default function MyGroupsScreen() {
 
       if (invitesError) throw invitesError;
       setPendingInvites(invites || []);
-
     } catch (error) {
       console.error('Error loading data:', error);
       Alert.alert('Error', 'Failed to load groups and invites');
@@ -375,7 +432,6 @@ export default function MyGroupsScreen() {
             role: 'member',
             joined_at: new Date().toISOString()
           });
-
         if (memberError) throw memberError;
       }
 
@@ -389,6 +445,7 @@ export default function MyGroupsScreen() {
       Alert.alert('Error', 'Failed to process invite');
     }
   };
+
   const renderGroupCard = (group) => (
     <View key={group.group_id} style={styles.groupCard}>
       <View style={styles.groupInfo}>
@@ -432,6 +489,7 @@ export default function MyGroupsScreen() {
       </View>
     </View>
   );
+
   const leaveGroup = async (groupId) => {
     try {
       // Check current member count
@@ -465,7 +523,6 @@ export default function MyGroupsScreen() {
                   .delete()
                   .eq('group_id', groupId)
                   .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
-
                 if (error) throw error;
                 loadData();
               } catch (error) {
@@ -539,41 +596,7 @@ export default function MyGroupsScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          myGroups.map((group) => (
-            <View key={group.group_id} style={styles.groupCard}>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupName}>{group.study_groups.name}</Text>
-                <Text style={styles.classInfo}>
-                  {group.study_groups.semester_schedules.class_name}
-                </Text>
-                <Text style={styles.termInfo}>
-                  {group.study_groups.semester_schedules.term}
-                </Text>
-                <Text style={styles.roleText}>
-                  Role: {group.role.charAt(0).toUpperCase() + group.role.slice(1)}
-                </Text>
-              </View>
-              
-              <View style={styles.groupActions}>
-                {group.role === 'admin' && (
-                  <TouchableOpacity 
-                    style={styles.manageButton}
-                    onPress={() => setSelectedGroup(group)}
-                  >
-                    <Ionicons name="people" size={24} color="#007AFF" />
-                  </TouchableOpacity>
-                )}
-                {group.role !== 'admin' && (
-                  <TouchableOpacity 
-                    style={styles.leaveButton}
-                    onPress={() => leaveGroup(group.group_id)}
-                  >
-                    <Ionicons name="exit-outline" size={24} color="#FF3B30" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ))
+          myGroups.map((group) => renderGroupCard(group))
         )}
       </View>
 
@@ -594,6 +617,10 @@ export default function MyGroupsScreen() {
     </ScrollView>
   );
 }
+
+// -------------------------
+// Styles
+// -------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -650,9 +677,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   groupCard: {
-    flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
@@ -660,18 +686,22 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   groupInfo: {
-    flex: 1,
+    marginBottom: 12,
   },
   groupName: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#2C3E50',
     marginBottom: 4,
-    color: '#333',
+  },
+  groupDetails: {
+    fontSize: 14,
+    color: '#7F8C8D',
   },
   classInfo: {
     fontSize: 16,
@@ -689,195 +719,148 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   groupActions: {
-    flexDirection: 'row'
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  groupActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
+  manageButton: {
+    marginRight: 8,
+    padding: 4,
+  },
+  leaveButton: {
+    justifyContent: 'center',
+    padding: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  createButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
     },
-    manageButton: {
-      marginRight: 8,
-      padding: 4,
-    },
-    leaveButton: {
-      justifyContent: 'center',
-      padding: 4,
-    },
-    emptyState: {
-      alignItems: 'center',
-      padding: 32,
-    },
-    emptyText: {
-      fontSize: 16,
-      color: '#666',
-      marginTop: 12,
-      marginBottom: 16,
-      textAlign: 'center',
-    },
-    createButton: {
-      backgroundColor: '#007AFF',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-    },
-    createButtonText: {
-      color: '#fff',
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    modalContent: {
-      backgroundColor: '#fff',
-      margin: 20,
-      borderRadius: 12,
-      padding: 20,
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 5,
-      maxHeight: '80%',
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      marginBottom: 16,
-      color: '#333',
-    },
-    searchInput: {
-      backgroundColor: '#f5f5f5',
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 12,
-      fontSize: 16,
-    },
-    searchResults: {
-      marginBottom: 16,
-      maxHeight: 200,
-    },
-    searchResultItem: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f0f0f0',
-    },
-    userName: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: '#333',
-    },
-    userEmail: {
-      fontSize: 14,
-      color: '#666',
-    },
-    membersList: {
-      maxHeight: 300,
-    },
-    memberItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f0f0f0',
-    },
-    memberName: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: '#333',
-    },
-    memberRole: {
-      fontSize: 14,
-      color: '#666',
-    },
-    removeButton: {
-      padding: 4,
-    },
-    closeButton: {
-      marginTop: 16,
-      backgroundColor: '#007AFF',
-      padding: 12,
-      borderRadius: 8,
-      alignItems: 'center',
-    },
-    closeButtonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '500',
-    },
-      groupCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: {
-          width: 0,
-          height: 2,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 3,
-      },
-      groupInfo: {
-        marginBottom: 12,
-      },
-      groupName: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#2C3E50',
-        marginBottom: 4,
-      },
-      groupDetails: {
-        fontSize: 14,
-        color: '#7F8C8D',
-      },
-      groupActions: {
-        flexDirection: 'row',
-        gap: 8,
-      },
-      actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        gap: 6,
-      },
-      messageButton: {
-        backgroundColor: '#007AFF',
-      },
-      infoButton: {
-        backgroundColor: '#E3F2FD',
-      },
-      actionButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#fff',
-      },
-      groupActions: {
-        flexDirection: 'column',
-        gap: 8,
-        justifyContent: 'center',
-      },
-      actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        gap: 6,
-      },
-      chatButton: {
-        backgroundColor: '#4CAF50',
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      actionButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-      },
-    });
-  
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+  },
+  searchInput: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    fontSize: 16,
+  },
+  searchResults: {
+    marginBottom: 16,
+    maxHeight: 200,
+  },
+  searchResultItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#666',
+  },
+  membersList: {
+    maxHeight: 300,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  memberRole: {
+    fontSize: 14,
+    color: '#666',
+  },
+  removeButton: {
+    padding: 4,
+  },
+  closeButton: {
+    marginTop: 16,
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  chatButton: {
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  exitButton: {
+    backgroundColor: '#FF3B30',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  exitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+});

@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet,
+  Alert, 
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform 
+} from 'react-native';
 import { Link, router } from 'expo-router';
 import { supabase } from '../../supabaseClient';
 
@@ -38,41 +48,83 @@ export default function Login() {
   };
 
   const handleLogin = async () => {
-    const isEmailValid = validateEmail(email);
-    const isPasswordValid = validatePassword(password);
-
-    if (!isEmailValid || !isPasswordValid) {
-      return;
-    }
-
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
+  
+      // Validate inputs before attempting login
+      if (!validateEmail(email) || !validatePassword(password)) {
+        setLoading(false);
+        return;
+      }
+  
+      // Sign in user
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-
-      if (error) throw error;
-
-      if (data?.user) {
-        // Check if profile is complete
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (!profileData) {
-          router.push('/(auth)/profile-setup');
-        } else {
-          router.push('/(tabs)');
-        }
+  
+      if (signInError) throw signInError;
+  
+      if (!authData.user) {
+        Alert.alert("Login Failed", "No user returned from Supabase.");
+        return;
       }
+  
+      // First check if basic profile exists and is complete
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+  
+      if (profileError) {
+        // If profile doesn't exist, send to profile setup
+        if (profileError.code === 'PGRST116') {
+          router.replace('/profile-setup');
+          return;
+        }
+        throw profileError;
+      }
+  
+      // If profile isn't complete, send to profile setup
+      if (!profile.has_completed_setup) {
+        router.replace('/profile-setup');
+        return;
+      }
+  
+      // Since user has completed profile setup, go to main app
+      router.replace('/(tabs)');
+  
     } catch (error: any) {
+      console.error("Login Error:", error);
       Alert.alert(
-        'Login Error',
-        error?.message || 'An error occurred during login'
+        "Login Failed", 
+        error.message || "An unexpected error occurred"
       );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    // Ensure a valid email is provided
+    if (!validateEmail(email)) {
+      Alert.alert("Forgot Password", "Please enter a valid email address first.");
+      return;
+    }
+    try {
+      setLoading(true);
+      // Call Supabase's resetPasswordForEmail function.
+      // Replace the redirectTo URL with your actual reset password page URL or deep link.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'studify://update-password' // For example, if using a custom scheme
+        // OR, if using a web URL: 'https://your-app-url.com/update-password'
+      });
+      if (error) throw error;
+      Alert.alert("Success", "Check your email for password reset instructions.");
+    } catch (error: any) {
+      console.error("Forgot Password Error:", error);
+      Alert.alert("Error", error.message || "Failed to send reset password email.");
     } finally {
       setLoading(false);
     }
@@ -84,7 +136,7 @@ export default function Login() {
       style={styles.container}
     >
       <View style={styles.innerContainer}>
-        <Text style={styles.title}>Welcome to Studify</Text>
+        <Text style={styles.title}>Welcome to Semster</Text>
         <Text style={styles.subtitle}>Login to continue</Text>
 
         <View style={styles.inputContainer}>
@@ -100,6 +152,7 @@ export default function Login() {
             autoCapitalize="none"
             autoComplete="email"
             editable={!loading}
+            placeholderTextColor="#666"
           />
           {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
@@ -114,6 +167,7 @@ export default function Login() {
             secureTextEntry
             editable={!loading}
             autoComplete="password"
+            placeholderTextColor="#666"
           />
           {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
         </View>
@@ -128,6 +182,11 @@ export default function Login() {
           ) : (
             <Text style={styles.buttonText}>Login</Text>
           )}
+        </TouchableOpacity>
+
+        {/* Forgot Password Link */}
+        <TouchableOpacity style={styles.linkButton} onPress={handleForgotPassword}>
+          <Text style={styles.linkText}>Forgot Password?</Text>
         </TouchableOpacity>
 
         <Link href="/(auth)/register" asChild>
@@ -165,15 +224,16 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 20,
+    gap: 16,
   },
   input: {
     backgroundColor: '#f5f5f5',
     padding: 15,
     borderRadius: 12,
-    marginBottom: 8,
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#f5f5f5',
+    color: '#1a1a1a',
   },
   inputError: {
     borderColor: '#ff4444',
@@ -182,7 +242,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff4444',
     fontSize: 12,
-    marginBottom: 10,
+    marginTop: -12,
     marginLeft: 5,
   },
   button: {
@@ -191,6 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 15,
+    height: 56,
   },
   buttonDisabled: {
     backgroundColor: '#99c9ff',
@@ -203,10 +264,11 @@ const styles = StyleSheet.create({
   linkButton: {
     marginTop: 10,
     alignItems: 'center',
+    padding: 12,
   },
   linkText: {
     color: '#007AFF',
     fontSize: 16,
     fontWeight: '500',
-  },
+  }
 });

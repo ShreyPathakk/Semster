@@ -159,6 +159,7 @@ export default function SemesterSetup() {
             onValueChange={(itemValue) => setSelectedTerm(itemValue)}
             style={styles.picker}
             enabled={!loading}
+            itemStyle={{ color: '#333' }}
           >
             <Picker.Item label="Select a term" value="" />
             {generateTerms().map((term) => (
@@ -170,7 +171,11 @@ export default function SemesterSetup() {
         {/* Class Form */}
         <View style={styles.classForm}>
           <Text style={styles.subtitle}>Add Class ({classes.length}/5)</Text>
-          
+          {/* Instructional text to help the user */}
+          <Text style={styles.subText}>
+            Please enter the class name, professor name, and section exactly as shown on your Canvas Portal.
+          </Text>
+
           <TextInput
             style={styles.input}
             placeholder="Class Name"
@@ -260,6 +265,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#333',
+  },
+  subText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   label: {
     fontSize: 16,

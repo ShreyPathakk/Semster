@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   editButtonText: {
-    color: '#007AFF',
+    color: '#000',
     fontSize: 14,
     fontWeight: '600',
   },

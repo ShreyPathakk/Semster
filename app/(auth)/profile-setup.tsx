@@ -16,55 +16,119 @@ import ProfileImage from '../components/Profile/ProfileImage';
 import { supabase } from '../../supabaseClient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-
-interface Profile {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-  major: string | null;
-  year: string | null;
-  student_id: string | null;
-  current_status: string | null;
-  about_me: string | null;
-  has_completed_setup: boolean;
-}
+import { useState, useEffect } from 'react';
 
 export default function ProfileSetup() {
-  const [username, setUsername] = useState('');
+  // Basic fields
+  const [username, setUsername]     = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [studentId, setStudentId] = useState('');
-  const [year, setYear] = useState<string | null>(null);
-  const [yearOpen, setYearOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [major, setMajor] = useState('');
+  const [year, setYear]             = useState<string | null>(null);
+  const [major, setMajor]           = useState('');
+  const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
+
+  // UI states
+  const [yearOpen, setYearOpen]     = useState(false);
+  const [loading, setLoading]       = useState(false);
+
+  // So we can pass to ProfileImage
+  const [userId, setUserId]         = useState<string | null>(null);
 
   const yearItems = [
-    { label: 'Freshman', value: 'freshman' },
-    { label: 'Sophomore', value: 'sophomore' },
-    { label: 'Junior', value: 'junior' },
-    { label: 'Senior', value: 'senior' },
+    { label: 'Freshman', value: 'Freshman' },
+    { label: 'Sophomore', value: 'Sophomore' },
+    { label: 'Junior',   value: 'Junior' },
+    { label: 'Senior',   value: 'Senior' },
   ];
 
-  const isValidUsername = (username: string) => {
-    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,19}$/;
-    return usernameRegex.test(username);
+  useEffect(() => {
+    checkFirstTimeSetup();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      if (event === 'SIGNED_OUT') {
+        router.replace('/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const checkFirstTimeSetup = async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        console.error('No valid session or error:', sessionError);
+        router.replace('/login');
+        return;
+      }
+
+      setUserId(session.user.id);
+
+      // Refresh session just like your code
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+        router.replace('/login');
+        return;
+      }
+
+      // Fetch the profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profileError || profileError.code === 'PGRST116') {
+        // If we got a profile, populate
+        if (profile) {
+          if (profile.has_completed_setup) {
+            router.replace('/home');
+            return;
+          }
+          setUsername(profile.username || '');
+          setDisplayName(profile.display_name || '');
+          setYear(profile.year || null);
+          setMajor(profile.major || '');
+          setAvatarUrl(profile.avatar_url || null);
+        }
+      } else {
+        console.error('Profile fetch error:', profileError);
+      }
+    } catch (error) {
+      console.error('Setup check error:', error);
+      Alert.alert(
+        'Authentication Error',
+        'Please try logging in again.',
+        [{ text: 'OK', onPress: () => router.replace('/login') }]
+      );
+    }
   };
 
-  const checkUsername = async (username: string) => {
+  const isValidUsername = (value: string) => {
+    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_]{2,19}$/;
+    return usernameRegex.test(value);
+  };
+
+  // Check if username is taken
+  const checkUsername = async (desiredUsername: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return false;
+
       const { data, error } = await supabase
         .from('profiles')
         .select('username')
-        .eq('username', username.toLowerCase())
+        .eq('username', desiredUsername.toLowerCase())
+        .neq('id', session.user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
-
+      // If data exists, that means username is taken
       return !data;
     } catch (error) {
       console.error('Error checking username:', error);
@@ -73,53 +137,48 @@ export default function ProfileSetup() {
   };
 
   const handleComplete = async () => {
-    if (!username || !displayName || !studentId || !year || !major) {
-      Alert.alert('Error', 'Please fill in all required fields.');
-      return;
-    }
-
-    if (!isValidUsername(username)) {
-      Alert.alert(
-        'Invalid Username', 
-        'Username must be 3-20 characters long, start with a letter, and contain only letters, numbers, and underscores.'
-      );
-      return;
-    }
-
     setLoading(true);
-
     try {
-      const isAvailable = await checkUsername(username);
-      if (!isAvailable) {
-        Alert.alert('Username Taken', 'Please choose a different username.');
+      await supabase.auth.refreshSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) {
+        Alert.alert('Session Expired', 'Please log in again.');
+        router.replace('/login');
         return;
       }
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) throw userError;
-      if (!user) throw new Error('No authenticated user found.');
+      // Validate username
+      if (!isValidUsername(username)) {
+        Alert.alert('Invalid Username', 'Must start with a letter and be 3-20 chars (letters, numbers, underscores).');
+        return;
+      }
 
+      // Check if available
+      const isAvailable = await checkUsername(username);
+      if (!isAvailable) {
+        Alert.alert('Username Taken', 'Please pick a different username.');
+        return;
+      }
+
+      // Upsert profile
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
-          id: user.id,
+          id: session.user.id,
           username: username.toLowerCase(),
           display_name: displayName,
-          student_id: studentId,
           year,
           major,
           avatar_url: avatarUrl,
           has_completed_setup: true,
           updated_at: new Date().toISOString(),
         });
-
       if (profileError) throw profileError;
 
       router.replace('/semester-setup');
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save your profile. Please try again.');
+    } catch (err: any) {
+      console.error('Error saving profile:', err);
+      Alert.alert('Error', err.message || 'Failed to save your profile.');
     } finally {
       setLoading(false);
     }
@@ -131,7 +190,10 @@ export default function ProfileSetup() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.container}>
+        <ScrollView
+          style={styles.container}
+          nestedScrollEnabled
+        >
           <View style={styles.content}>
             <View style={styles.headerContainer}>
               <Text style={styles.title}>Complete Your Profile</Text>
@@ -139,10 +201,11 @@ export default function ProfileSetup() {
             </View>
 
             <View style={styles.imageContainer}>
+              {/* Pass the actual userId here */}
               <ProfileImage 
                 url={avatarUrl}
                 onUpload={setAvatarUrl}
-                userId={null}
+                userId={userId}
               />
               <Text style={styles.imageHint}>Tap to add profile picture</Text>
             </View>
@@ -175,23 +238,10 @@ export default function ProfileSetup() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="card-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Student ID"
-                  value={studentId}
-                  onChangeText={setStudentId}
-                  keyboardType="numeric"
-                  editable={!loading}
-                  placeholderTextColor="#666"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
                 <Ionicons name="book-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Major (e.g. Computer Science)"
+                  placeholder="Major"
                   value={major}
                   onChangeText={setMajor}
                   editable={!loading}
@@ -199,29 +249,29 @@ export default function ProfileSetup() {
                 />
               </View>
 
-              <View style={styles.dropdownContainer}>
-                <DropDownPicker
-                  open={yearOpen}
-                  value={year}
-                  items={yearItems}
-                  setOpen={setYearOpen}
-                  setValue={setYear}
-                  placeholder="Select Year"
-                  style={styles.dropdown}
-                  textStyle={styles.dropdownText}
-                  disabled={loading}
-                  placeholderStyle={styles.dropdownPlaceholder}
-                  dropDownContainerStyle={styles.dropdownList}
-                  zIndex={1000}
-                />
-              </View>
+              <DropDownPicker
+                open={yearOpen}
+                value={year}
+                items={yearItems}
+                setOpen={setYearOpen}
+                setValue={setYear}
+                placeholder="Select Year"
+                listMode="MODAL"              // Avoid nested VirtualizedList
+                style={styles.dropdown}
+                textStyle={styles.dropdownText}
+                disabled={loading}
+                placeholderStyle={styles.dropdownPlaceholder}
+                dropDownContainerStyle={styles.dropdownList}
+                zIndex={1000}
+              />
 
               <Text style={styles.usernameInfo}>
-                Username must be 3-20 characters long and can contain letters, numbers, and underscores.
+                Username must be 3-20 characters, start with a letter, 
+                and can contain letters, numbers, and underscores.
               </Text>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleComplete}
               disabled={loading}
@@ -242,6 +292,7 @@ export default function ProfileSetup() {
   );
 }
 
+// ---------- Styles ----------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -294,9 +345,6 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     height: '100%',
   },
-  dropdownContainer: {
-    marginBottom: 120, // Fixed height instead of dynamic
-  },
   dropdown: {
     backgroundColor: '#f5f5f5',
     borderWidth: 0,
@@ -309,14 +357,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f0f0f0',
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 2,
   },
   dropdownText: {
     fontSize: 16,
@@ -350,6 +390,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 18,
-    marginTop: -8,
-  }
+  },
 });

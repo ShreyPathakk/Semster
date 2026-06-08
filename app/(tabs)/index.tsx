@@ -1,7 +1,17 @@
 // app/(tabs)/index.tsx
+import 'react-native-get-random-values';
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  TouchableOpacity, 
+  ScrollView, 
+  ActivityIndicator 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { supabase } from '../../supabaseClient';
 
@@ -24,9 +34,9 @@ const COLORS = {
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState(null);
-  const [todayClasses, setTodayClasses] = useState([]);
-  const [activeGroups, setActiveGroups] = useState([]);
+  const [userData, setUserData] = useState<any>(null);
+  const [todayClasses, setTodayClasses] = useState<any[]>([]);
+  const [activeGroups, setActiveGroups] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [stats, setStats] = useState({
     totalClasses: 0,
@@ -84,7 +94,7 @@ export default function HomeScreen() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
         throw profileError;
@@ -152,10 +162,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Brand Header */}
-      <View style={styles.brandHeader}>
+      {/* Brand Header with Gradient */}
+      <LinearGradient
+        colors={[COLORS.primary, COLORS.accent]}
+        style={styles.brandHeader}
+      >
         <View style={styles.brandContainer}>
-          <Text style={styles.brandTextMain}>Socia</Text>
+          <Text style={styles.brandTextMain}>Semster</Text>
           <View style={styles.brandDot} />
         </View>
         <View style={styles.headerRight}>
@@ -163,7 +176,7 @@ export default function HomeScreen() {
             style={styles.iconButton}
             onPress={() => router.push('/requests')}
           >
-            <Ionicons name="notifications-outline" size={28} color={COLORS.text.primary} />
+            <Ionicons name="notifications-outline" size={28} color={COLORS.background} />
             {pendingRequests > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{pendingRequests}</Text>
@@ -174,10 +187,10 @@ export default function HomeScreen() {
             style={styles.iconButton}
             onPress={() => router.push('/profile')}
           >
-            <Ionicons name="person-circle-outline" size={28} color={COLORS.text.primary} />
+            <Ionicons name="person-circle-outline" size={28} color={COLORS.background} />
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
@@ -186,30 +199,37 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Stats Section */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.statItem, styles.statItemBorder]}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.primary}15` }]}>
-              <Ionicons name="book" size={24} color={COLORS.primary} />
+        {/* Stats Section with Gradient Border */}
+        <LinearGradient
+          colors={[COLORS.primary, COLORS.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.statsGradient}
+        >
+          <View style={styles.statsContainer}>
+            <View style={[styles.statItem, styles.statItemBorder]}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.primary}15` }]}>
+                <Ionicons name="book" size={24} color={COLORS.primary} />
+              </View>
+              <Text style={styles.statNumber}>{stats.totalClasses}</Text>
+              <Text style={styles.statLabel}>Classes</Text>
             </View>
-            <Text style={styles.statNumber}>{stats.totalClasses}</Text>
-            <Text style={styles.statLabel}>Classes</Text>
-          </View>
-          <View style={[styles.statItem, styles.statItemBorder]}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.success}15` }]}>
-              <Ionicons name="people" size={24} color={COLORS.success} />
+            <View style={[styles.statItem, styles.statItemBorder]}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.success}15` }]}>
+                <Ionicons name="people" size={24} color={COLORS.success} />
+              </View>
+              <Text style={[styles.statNumber, { color: COLORS.success }]}>{stats.totalGroups}</Text>
+              <Text style={styles.statLabel}>Groups</Text>
             </View>
-            <Text style={[styles.statNumber, { color: COLORS.success }]}>{stats.totalGroups}</Text>
-            <Text style={styles.statLabel}>Groups</Text>
-          </View>
-          <View style={styles.statItem}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.secondary}15` }]}>
-              <Ionicons name="person" size={24} color={COLORS.secondary} />
+            <View style={styles.statItem}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${COLORS.secondary}15` }]}>
+                <Ionicons name="person" size={24} color={COLORS.secondary} />
+              </View>
+              <Text style={[styles.statNumber, { color: COLORS.secondary }]}>{stats.totalBuddies}</Text>
+              <Text style={styles.statLabel}>Buddies</Text>
             </View>
-            <Text style={[styles.statNumber, { color: COLORS.secondary }]}>{stats.totalBuddies}</Text>
-            <Text style={styles.statLabel}>Buddies</Text>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Today's Classes */}
         <View style={styles.section}>
@@ -358,10 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 15,
-    paddingBottom: 10,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    paddingBottom: 15,
   },
   brandContainer: {
     flexDirection: 'row',
@@ -370,7 +387,7 @@ const styles = StyleSheet.create({
   brandTextMain: {
     fontSize: 32,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.background, // White text for contrast on the gradient
     letterSpacing: 1,
     fontFamily: 'System',
     fontStyle: 'italic',
@@ -428,21 +445,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: COLORS.surface,
+  statsGradient: {
     marginHorizontal: 20,
     marginTop: 10,
     borderRadius: 16,
-    shadowColor: COLORS.text.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 2,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.background,
+    padding: 20,
+    borderRadius: 14,
   },
   statItem: {
     alignItems: 'center',
